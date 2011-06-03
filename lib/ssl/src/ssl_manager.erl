@@ -270,14 +270,14 @@ handle_cast({invalidate_session, Host, Port,
 	    #state{session_cache = Cache,
 		   session_cache_cb = CacheCb} = State) ->
     CacheCb:update(Cache, {{Host, Port}, ID}, Session#session{is_resumable = false}),
-    timer:apply_after(?CLEAN_SESSION_DB, CacheCb, delayed_clean_session, [{{Host, Port}, ID}]),
+    timer:apply_after(?CLEAN_SESSION_DB, CacheCb, delete, [{{Host, Port}, ID}]),
     {noreply, State};
 
 handle_cast({invalidate_session, Port, #session{session_id = ID} = Session},
 	    #state{session_cache = Cache,
 		   session_cache_cb = CacheCb} = State) ->
     CacheCb:update(Cache, {Port, ID}, Session#session{is_resumable = false}),
-    timer:apply_after(?CLEAN_SESSION_DB, CacheCb, delayed_clean_session, [{Port, ID}]),
+    timer:apply_after(?CLEAN_SESSION_DB, CacheCb, delete, [{Port, ID}]),
     {noreply, State};
 
 handle_cast({recache_pem, File, LastWrite, Pid, From},
@@ -311,14 +311,6 @@ handle_info(validate_sessions, #state{session_cache_cb = CacheCb,
 			      self(), validate_sessions),
     start_session_validator(Cache, CacheCb, LifeTime),
     {noreply, State#state{session_validation_timer = Timer}};
-
-%% additional handle_info for delayed session cleaning
-%% http://erlang.2086793.n4.nabble.com/ssl-manager-invalidate-session-issues-td3555264.html
-handle_info({delayed_clean_session, Key},
-  #state{session_cache = Cache,
-         session_cache_cb = CacheCb} = State) ->
-    CacheCb:delete(Cache, Key),
-    {noreply, State};
 
 handle_info({'EXIT', _, _}, State) ->
     %% Session validator died!! Do we need to take any action?
